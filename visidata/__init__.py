@@ -34,5 +34,6 @@ from .loaders.shp import *
 from .loaders.mbtiles import *
 from .loaders.http import *
 from .loaders.html import *
+from .loaders.cbresponse import *
 
 addGlobals(globals())

@@ -4,6 +4,7 @@ requests            # http
 lxml                # html
 openpyxl            # xlsx
 xlrd                # xls
+cbapi               # cbresponse
 
 # included in visidata[full]
 h5py                # hdf5
