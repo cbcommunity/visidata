@@ -1,0 +1,101 @@
+#!/usr/bin/env python3
+#
+# Usage: $0 [<options>] [<input> ...]
+#        $0 [<options>] --play <cmdlog> [--batch] [-w <waitsecs>] [-o <output>] [field=value ...]
+
+__version__ = '1.0'
+
+import os
+from visidata import *
+from cbapi.example_helpers import build_cli_parser, get_cb_response_object
+
+
+option('color_diff', 'red', 'color of values different from --diff source')
+option('color_diff_add', 'yellow', 'color of rows/columns added to --diff source')
+
+
+# for --play
+def eval_vd(logpath, *args, **kwargs):
+    'Instantiate logpath with args/kwargs replaced and replay all commands.'
+    log = logpath.read_text().format(*args, **kwargs)
+    src = PathFd(logpath.fqpn, io.StringIO(log), filesize=len(log))
+    vs = openSource(src, filetype='vd')
+    vd().push(vs)
+    vs.vd = vd()
+    return vs
+
+# for --diff
+def makeDiffColorizer(othersheet):
+    def colorizeDiffs(sheet, col, row, cellval):
+        vcolidx = sheet.visibleCols.index(col)
+        rowidx = sheet.rows.index(row)
+        if vcolidx < len(othersheet.visibleCols) and rowidx < len(othersheet.rows):
+            otherval = othersheet.visibleCols[vcolidx].getValue(othersheet.rows[rowidx])
+            if cellval.value != otherval:
+                return options.color_diff
+        else:
+            return options.color_diff_add
+    return colorizeDiffs
+
+
+def main():
+    'Open the given sources using the VisiData interface.'
+    parser = build_cli_parser("Cb Response VisiData interface")
+
+    parser.add_argument('query', nargs='*', help='Cb Response process query')
+    parser.add_argument('-i', '--groupid', action='store_true', help='Group results by process ID')
+    parser.add_argument('-v', '--version', action='version', version=__version__)
+
+    for optname, v in vdtui.baseOptions.items():
+        name, optval, defaultval, helpstr = v
+        if name.startswith('color_') or name.startswith('disp_'):
+            continue
+        action = 'store_true' if optval is False else 'store'
+        parser.add_argument('--' + optname.replace('_', '-'), action=action, dest=optname, default=None, help=helpstr)
+
+    args = parser.parse_args()
+    cb = get_cb_response_object(args)
+
+    # user customisations in config file in standard location
+    fnrc = '~/.visidatarc'
+    p = Path(fnrc)
+    if p.exists():
+        code = compile(open(p.resolve()).read(), p.resolve(), 'exec')
+        exec(code, globals())
+
+    vdtui.addGlobals(globals())
+
+    # command-line overrides
+    for optname, optval in vars(args).items():
+        if optval is not None and optname in vdtui.baseOptions.keys():
+            vdtui.options[optname] = optval
+
+    stdinSource = None
+    if not sys.stdin.isatty():
+        # duplicate stdin for input and reopen tty as stdin
+        stdinSource = PathFd('stdin', open(os.dup(0)))
+        f = open('/dev/tty')
+        os.dup2(f.fileno(), 0)
+
+    startrow, startcol = None, None
+    fmtargs = []
+    fmtkwargs = {}
+    inputs = ['.']
+
+    sources = []
+    vs = open_cbresponse(' '.join(args.query), group_by_id=args.groupid)
+    vdtui.vd().cmdlog.openHook(vs, inputs[0])
+    sources.append(vs)
+    if startrow is not None:
+        vs.cursorRowIndex = int(startrow) - 1
+    if startcol is not None:
+        vs.cursorVisibleColIndex = int(startcol) - 1
+
+    vdtui.run(*sources)
+    return 0
+
+
+if __name__ == '__main__':
+    vdtui.status(__version__)
+    main()
+    os._exit(0)  # cleanup can be expensive with large datasets
