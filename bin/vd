@@ -116,23 +116,14 @@ def main():
             inputs = ['.']
 
         sources = []
-        if args.filetype == "cbresponse":
-            vs = open_cbresponse(inputs[0])
-            vdtui.vd().cmdlog.openHook(vs, inputs[0])
+        for src in inputs:
+            vs = openSource(src)
+            vdtui.vd().cmdlog.openHook(vs, src)
             sources.append(vs)
             if startrow is not None:
-                vs.cursorRowIndex = int(startrow) - 1
+                vs.cursorRowIndex = int(startrow)-1
             if startcol is not None:
-                vs.cursorVisibleColIndex = int(startcol) - 1
-        else:
-            for src in inputs:
-                vs = openSource(src)
-                vdtui.vd().cmdlog.openHook(vs, src)
-                sources.append(vs)
-                if startrow is not None:
-                    vs.cursorRowIndex = int(startrow)-1
-                if startcol is not None:
-                    vs.cursorVisibleColIndex = int(startcol)-1
+                vs.cursorVisibleColIndex = int(startcol)-1
 
         vdtui.run(*sources)
         return
