@@ -44,6 +44,8 @@ def main():
 
     parser.add_argument('query', nargs='*', help='Cb Response process query')
     parser.add_argument('-i', '--groupid', action='store_true', help='Group results by process ID')
+    parser.add_argument('-s', '--sort', default='start', help='Sort by field [descending]')
+    parser.add_argument('-r', '--reverse', action='store_true', help='Change sort to ascending')
     parser.add_argument('-v', '--version', action='version', version=__version__)
 
     for optname, v in vdtui.baseOptions.items():
@@ -83,7 +85,12 @@ def main():
     inputs = ['.']
 
     sources = []
-    vs = open_cbresponse(' '.join(args.query), group_by_id=args.groupid)
+    if args.reverse:
+        sort_by = f"{args.sort}"
+    else:
+        sort_by = f"{args.sort} desc"
+
+    vs = open_cbresponse(' '.join(args.query), group_by_id=args.groupid, sort_by=sort_by)
     vdtui.vd().cmdlog.openHook(vs, inputs[0])
     sources.append(vs)
     if startrow is not None:

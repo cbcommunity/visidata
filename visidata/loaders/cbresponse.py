@@ -8,9 +8,9 @@ from cbapi.errors import ObjectNotFoundError
 # logging.getLogger("cbapi").setLevel(logging.DEBUG)
 
 
-def open_cbresponse(path, group_by_id=False):
+def open_cbresponse(path, group_by_id, sort_by):
     cb = CbResponseAPI()
-    vs = CbResponseSheet(cb, path, group_by_id)
+    vs = CbResponseSheet(cb, path, group_by_id, sort_by)
     vs.columns = ArrayNamedColumns(["id", "start", "username", "hostname", "cmdline"])
     return vs
 
@@ -45,17 +45,19 @@ def event_summary(event):
 
 class CbResponseSheet(Sheet):
     commands = [
-        Command(ENTER, 'vd.push(sheet.getProcessDetails(cursorRow[0]))', 'Get details for the given process')
+        Command(ENTER, 'vd.push(sheet.getProcessDetails(cursorRow[0]))', 'Get details for the given process'),
+        Command("ALT-BUTTON1_RELEASED", 'sheet.launchBrowser(cursorRow[0])', 'Launch web browser to view process'),
     ]
-    def __init__(self, cb, querystring, group_by_id):
+    def __init__(self, cb, querystring, group_by_id, sort_by):
         super().__init__("CbResponse", source=querystring, tableName=f"Process Query: {querystring}")
         self.querystring = querystring
         self.group_by_id = group_by_id
+        self.sort_by = sort_by
         self.cb = cb
 
     @async
     def reload(self):
-        query = self.cb.select(Process).where(self.querystring)
+        query = self.cb.select(Process).where(self.querystring).sort(self.sort_by)
         if self.group_by_id:
             query = query.group_by("id")
 
@@ -63,9 +65,12 @@ class CbResponseSheet(Sheet):
             row = [str(x) for x in [r.id, r.start, r.username, r.hostname, r.cmdline]]
             self.addRow(row)
 
-    def getProcessDetails(self, sheetname):
-        proc = self.cb.select(Process, sheetname)
+    def getProcessDetails(self, procid):
+        proc = self.cb.select(Process, procid)
         return CbResponseProcessSheet(self.cb, proc)
+
+    def launchBrowser(self, procid):
+        os.system("open {0}".format(self.cb.select(Process, procid).webui_link))
 
 
 class CbResponseProcessSheet(Sheet):
